@@ -968,10 +968,11 @@ angular.module('ui.dashboard')
       def = convertToDefinition(def);
       this.push(def);
       this.map[def.name] = def;
-    }
+    };
 
     return WidgetDefCollection;
   });
+
 /*
  * Copyright (c) 2014 DataTorrent, Inc. ALL Rights Reserved.
  *
