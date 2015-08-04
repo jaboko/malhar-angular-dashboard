@@ -19,274 +19,279 @@ angular.module('ui.dashboard', ['ui.bootstrap', 'ui.sortable']);
 
 angular.module('ui.dashboard')
 
-  .directive('dashboard', ['WidgetModel', 'WidgetDefCollection', '$modal', 'DashboardState', '$log', function (WidgetModel, WidgetDefCollection, $modal, DashboardState, $log) {
+    .directive('dashboard', ['WidgetModel', 'WidgetDefCollection', '$modal', 'DashboardState', '$log', '$compile',
+      function (WidgetModel, WidgetDefCollection, $modal, DashboardState, $log, $compile) {
 
-    return {
-      restrict: 'A',
-      templateUrl: function(element, attr) {
-        return attr.templateUrl ? attr.templateUrl : 'components/directives/dashboard/dashboard.html';
-      },
-      scope: true,
+        return {
+          restrict: 'A',
+          template: '<ng-include src="getTemplateUrl()"></ng-include>',
+          scope: true,
 
-      controller: ['$scope', '$attrs', function (scope, attrs) {
-        // default options
-        var defaults = {
-          stringifyStorage: true,
-          hideWidgetSettings: false,
-          hideWidgetClose: false,
-          settingsModalOptions: {
-            templateUrl: 'components/directives/dashboard/widget-settings-template.html',
-            controller: 'WidgetSettingsCtrl'
-          },
-          onSettingsClose: function(result, widget) { // NOTE: dashboard scope is also passed as 3rd argument
-            jQuery.extend(true, widget, result);
-          },
-          onSettingsDismiss: function(reason) { // NOTE: dashboard scope is also passed as 2nd argument
-            $log.info('widget settings were dismissed. Reason: ', reason);
-          }
-        };
-
-        // from dashboard="options"
-        scope.options = scope.$eval(attrs.dashboard);
-
-        // Deep options
-        scope.options.settingsModalOptions = scope.options.settingsModalOptions || {};
-        _.each(['settingsModalOptions'], function(key) {
-          // Ensure it exists on scope.options
-          scope.options[key] = scope.options[key] || {};
-          // Set defaults
-          _.defaults(scope.options[key], defaults[key]);
-        });
-
-        // Shallow options
-        _.defaults(scope.options, defaults);
-
-        // sortable options
-        var sortableDefaults = {
-          stop: function () {
-            scope.saveDashboard();
-          },
-          handle: '.widget-header',
-          distance: 5
-        };
-        scope.sortableOptions = angular.extend({}, sortableDefaults, scope.options.sortableOptions || {});
-
-      }],
-      link: function (scope) {
-
-        // Save default widget config for reset
-        scope.defaultWidgets = scope.options.defaultWidgets;
-
-        scope.widgetDefs = new WidgetDefCollection(scope.options.widgetDefinitions);
-        var count = 1;
-
-        // Instantiate new instance of dashboard state
-        scope.dashboardState = new DashboardState(
-          scope.options.storage,
-          scope.options.storageId,
-          scope.options.storageHash,
-          scope.widgetDefs,
-          scope.options.stringifyStorage
-        );
-
-        /**
-         * Instantiates a new widget on the dashboard
-         * @param {Object} widgetToInstantiate The definition object of the widget to be instantiated
-         */
-        scope.addWidget = function (widgetToInstantiate, doNotSave) {
-
-          if (typeof widgetToInstantiate === 'string') {
-            widgetToInstantiate = {
-              name: widgetToInstantiate
+          controller: ['$scope', '$attrs', function (scope, attrs) {
+            // default options
+            var defaults = {
+              stringifyStorage: true,
+              hideWidgetSettings: false,
+              hideWidgetClose: false,
+              settingsModalOptions: {
+                templateUrl: 'components/directives/dashboard/widget-settings-template.html',
+                controller: 'WidgetSettingsCtrl'
+              },
+              onSettingsClose: function(result, widget) { // NOTE: dashboard scope is also passed as 3rd argument
+                jQuery.extend(true, widget, result);
+              },
+              onSettingsDismiss: function(reason) { // NOTE: dashboard scope is also passed as 2nd argument
+                $log.info('widget settings were dismissed. Reason: ', reason);
+              }
             };
-          }
 
-          var defaultWidgetDefinition = scope.widgetDefs.getByName(widgetToInstantiate.name);
-          if (!defaultWidgetDefinition) {
-            throw 'Widget ' + widgetToInstantiate.name + ' is not found.';
-          }
+            // from dashboard="options"
+            scope.options = scope.$eval(attrs.dashboard);
 
-          // Determine the title for the new widget
-          var title;
-          if (!widgetToInstantiate.title && !defaultWidgetDefinition.title) {
-            widgetToInstantiate.title = 'Widget ' + count++;
-          }
+            // Deep options
+            scope.options.settingsModalOptions = scope.options.settingsModalOptions || {};
+            _.each(['settingsModalOptions'], function(key) {
+              // Ensure it exists on scope.options
+              scope.options[key] = scope.options[key] || {};
+              // Set defaults
+              _.defaults(scope.options[key], defaults[key]);
+            });
 
-          // Instantiation
-          var widget = new WidgetModel(defaultWidgetDefinition, widgetToInstantiate);
+            // Shallow options
+            _.defaults(scope.options, defaults);
 
-          // Add to the widgets array
-          scope.widgets.push(widget);
-          if (!doNotSave) {
-            scope.saveDashboard();
-          }
+            // sortable options
+            var sortableDefaults = {
+              stop: function () {
+                scope.saveDashboard();
+              },
+              handle: '.widget-header',
+              distance: 5
+            };
+            scope.sortableOptions = angular.extend({}, sortableDefaults, scope.options.sortableOptions || {});
 
-          return widget;
-        };
+          }],
+          link: function (scope, element, attrs) {
 
-        /**
-         * Removes a widget instance from the dashboard
-         * @param  {Object} widget The widget instance object (not a definition object)
-         */
-        scope.removeWidget = function (widget) {
-          scope.widgets.splice(_.indexOf(scope.widgets, widget), 1);
-          scope.saveDashboard();
-        };
+            scope.getTemplateUrl = function() {
+              return attrs.templateUrl ? attrs.templateUrl : 'components/directives/dashboard/dashboard.html';
+            };
 
-        /**
-         * Opens a dialog for setting and changing widget properties
-         * @param  {Object} widget The widget instance object
-         */
-        scope.openWidgetSettings = function (widget) {
+            $compile(element.contents())(scope);
 
-          // Set up $modal options 
-          var options = _.defaults(
-            { scope: scope },
-            widget.settingsModalOptions,
-            scope.options.settingsModalOptions);
+            // Save default widget config for reset
+            scope.defaultWidgets = scope.options.defaultWidgets;
 
-          // Ensure widget is resolved
-          options.resolve = {
-            widget: function () {
+            scope.widgetDefs = new WidgetDefCollection(scope.options.widgetDefinitions);
+            var count = 1;
+
+            // Instantiate new instance of dashboard state
+            scope.dashboardState = new DashboardState(
+                scope.options.storage,
+                scope.options.storageId,
+                scope.options.storageHash,
+                scope.widgetDefs,
+                scope.options.stringifyStorage
+            );
+
+            /**
+             * Instantiates a new widget on the dashboard
+             * @param {Object} widgetToInstantiate The definition object of the widget to be instantiated
+             */
+            scope.addWidget = function (widgetToInstantiate, doNotSave) {
+
+              if (typeof widgetToInstantiate === 'string') {
+                widgetToInstantiate = {
+                  name: widgetToInstantiate
+                };
+              }
+
+              var defaultWidgetDefinition = scope.widgetDefs.getByName(widgetToInstantiate.name);
+              if (!defaultWidgetDefinition) {
+                throw 'Widget ' + widgetToInstantiate.name + ' is not found.';
+              }
+
+              // Determine the title for the new widget
+              var title;
+              if (!widgetToInstantiate.title && !defaultWidgetDefinition.title) {
+                widgetToInstantiate.title = 'Widget ' + count++;
+              }
+
+              // Instantiation
+              var widget = new WidgetModel(defaultWidgetDefinition, widgetToInstantiate);
+
+              // Add to the widgets array
+              scope.widgets.push(widget);
+              if (!doNotSave) {
+                scope.saveDashboard();
+              }
+
               return widget;
-            }
-          };
-          
-          // Create the modal
-          var modalInstance = $modal.open(options);
-          var onClose = widget.onSettingsClose || scope.options.onSettingsClose;
-          var onDismiss = widget.onSettingsDismiss || scope.options.onSettingsDismiss;
+            };
 
-          // Set resolve and reject callbacks for the result promise
-          modalInstance.result.then(
-            function (result) {
+            /**
+             * Removes a widget instance from the dashboard
+             * @param  {Object} widget The widget instance object (not a definition object)
+             */
+            scope.removeWidget = function (widget) {
+              scope.widgets.splice(_.indexOf(scope.widgets, widget), 1);
+              scope.saveDashboard();
+            };
 
-              // Call the close callback
-              onClose(result, widget, scope);
+            /**
+             * Opens a dialog for setting and changing widget properties
+             * @param  {Object} widget The widget instance object
+             */
+            scope.openWidgetSettings = function (widget) {
 
-              //AW Persist title change from options editor
-              scope.$emit('widgetChanged', widget);
-            },
-            function (reason) {
-              
-              // Call the dismiss callback
-              onDismiss(reason, scope);
+              // Set up $modal options
+              var options = _.defaults(
+                  { scope: scope },
+                  widget.settingsModalOptions,
+                  scope.options.settingsModalOptions);
 
-            }
-          );
+              // Ensure widget is resolved
+              options.resolve = {
+                widget: function () {
+                  return widget;
+                }
+              };
 
-        };
+              // Create the modal
+              var modalInstance = $modal.open(options);
+              var onClose = widget.onSettingsClose || scope.options.onSettingsClose;
+              var onDismiss = widget.onSettingsDismiss || scope.options.onSettingsDismiss;
 
-        /**
-         * Remove all widget instances from dashboard
-         */
-        scope.clear = function (doNotSave) {
-          scope.widgets = [];
-          if (doNotSave === true) {
-            return;
-          }
-          scope.saveDashboard();
-        };
+              // Set resolve and reject callbacks for the result promise
+              modalInstance.result.then(
+                  function (result) {
 
-        /**
-         * Used for preventing default on click event
-         * @param {Object} event     A click event
-         * @param {Object} widgetDef A widget definition object
-         */
-        scope.addWidgetInternal = function (event, widgetDef) {
-          event.preventDefault();
-          scope.addWidget(widgetDef);
-        };
+                    // Call the close callback
+                    onClose(result, widget, scope);
 
-        /**
-         * Uses dashboardState service to save state
-         */
-        scope.saveDashboard = function (force) {
-          if (!scope.options.explicitSave) {
-            scope.dashboardState.save(scope.widgets);
-          } else {
-            if (!angular.isNumber(scope.options.unsavedChangeCount)) {
+                    //AW Persist title change from options editor
+                    scope.$emit('widgetChanged', widget);
+                  },
+                  function (reason) {
+
+                    // Call the dismiss callback
+                    onDismiss(reason, scope);
+
+                  }
+              );
+
+            };
+
+            /**
+             * Remove all widget instances from dashboard
+             */
+            scope.clear = function (doNotSave) {
+              scope.widgets = [];
+              if (doNotSave === true) {
+                return;
+              }
+              scope.saveDashboard();
+            };
+
+            /**
+             * Used for preventing default on click event
+             * @param {Object} event     A click event
+             * @param {Object} widgetDef A widget definition object
+             */
+            scope.addWidgetInternal = function (event, widgetDef) {
+              event.preventDefault();
+              scope.addWidget(widgetDef);
+            };
+
+            /**
+             * Uses dashboardState service to save state
+             */
+            scope.saveDashboard = function (force) {
+              if (!scope.options.explicitSave) {
+                scope.dashboardState.save(scope.widgets);
+              } else {
+                if (!angular.isNumber(scope.options.unsavedChangeCount)) {
+                  scope.options.unsavedChangeCount = 0;
+                }
+                if (force) {
+                  scope.options.unsavedChangeCount = 0;
+                  scope.dashboardState.save(scope.widgets);
+
+                } else {
+                  ++scope.options.unsavedChangeCount;
+                }
+              }
+            };
+
+            /**
+             * Wraps saveDashboard for external use.
+             */
+            scope.externalSaveDashboard = function() {
+              scope.saveDashboard(true);
+            };
+
+            /**
+             * Clears current dash and instantiates widget definitions
+             * @param  {Array} widgets Array of definition objects
+             */
+            scope.loadWidgets = function (widgets) {
+              // AW dashboards are continuously saved today (no "save" button).
+              //scope.defaultWidgets = widgets;
+              scope.savedWidgetDefs = widgets;
+              scope.clear(true);
+              _.each(widgets, function (widgetDef) {
+                scope.addWidget(widgetDef, true);
+              });
+            };
+
+            /**
+             * Resets widget instances to default config
+             * @return {[type]} [description]
+             */
+            scope.resetWidgetsToDefault = function () {
+              scope.loadWidgets(scope.defaultWidgets);
+              scope.saveDashboard();
+            };
+
+            // Set default widgets array
+            var savedWidgetDefs = scope.dashboardState.load();
+
+            // Success handler
+            function handleStateLoad(saved) {
               scope.options.unsavedChangeCount = 0;
+              if (saved && saved.length) {
+                scope.loadWidgets(saved);
+              } else if (scope.defaultWidgets) {
+                scope.loadWidgets(scope.defaultWidgets);
+              } else {
+                scope.clear(true);
+              }
             }
-            if (force) {
-              scope.options.unsavedChangeCount = 0;
-              scope.dashboardState.save(scope.widgets);
 
+            if (angular.isArray(savedWidgetDefs)) {
+              handleStateLoad(savedWidgetDefs);
+            } else if (savedWidgetDefs && angular.isObject(savedWidgetDefs) && angular.isFunction(savedWidgetDefs.then)) {
+              savedWidgetDefs.then(handleStateLoad, handleStateLoad);
             } else {
-              ++scope.options.unsavedChangeCount;
+              handleStateLoad();
             }
+
+            // expose functionality externally
+            // functions are appended to the provided dashboard options
+            scope.options.addWidget = scope.addWidget;
+            scope.options.loadWidgets = scope.loadWidgets;
+            scope.options.saveDashboard = scope.externalSaveDashboard;
+            scope.options.removeWidget = scope.removeWidget;
+            scope.options.openWidgetSettings = scope.openWidgetSettings;
+
+            // save state
+            scope.$on('widgetChanged', function (event) {
+              event.stopPropagation();
+              scope.saveDashboard();
+            });
           }
         };
-
-        /**
-         * Wraps saveDashboard for external use.
-         */
-        scope.externalSaveDashboard = function() {
-          scope.saveDashboard(true);
-        };
-
-        /**
-         * Clears current dash and instantiates widget definitions
-         * @param  {Array} widgets Array of definition objects
-         */
-        scope.loadWidgets = function (widgets) {
-          // AW dashboards are continuously saved today (no "save" button).
-          //scope.defaultWidgets = widgets;
-          scope.savedWidgetDefs = widgets;
-          scope.clear(true);
-          _.each(widgets, function (widgetDef) {
-            scope.addWidget(widgetDef, true);
-          });
-        };
-
-        /**
-         * Resets widget instances to default config
-         * @return {[type]} [description]
-         */
-        scope.resetWidgetsToDefault = function () {
-          scope.loadWidgets(scope.defaultWidgets);
-          scope.saveDashboard();
-        };
-
-        // Set default widgets array
-        var savedWidgetDefs = scope.dashboardState.load();
-
-        // Success handler
-        function handleStateLoad(saved) {
-          scope.options.unsavedChangeCount = 0;
-          if (saved && saved.length) {
-            scope.loadWidgets(saved);
-          } else if (scope.defaultWidgets) {
-            scope.loadWidgets(scope.defaultWidgets);
-          } else {
-            scope.clear(true);
-          }
-        }
-
-        if (angular.isArray(savedWidgetDefs)) {
-          handleStateLoad(savedWidgetDefs);
-        } else if (savedWidgetDefs && angular.isObject(savedWidgetDefs) && angular.isFunction(savedWidgetDefs.then)) {
-          savedWidgetDefs.then(handleStateLoad, handleStateLoad);
-        } else {
-          handleStateLoad();
-        }
-
-        // expose functionality externally
-        // functions are appended to the provided dashboard options
-        scope.options.addWidget = scope.addWidget;
-        scope.options.loadWidgets = scope.loadWidgets;
-        scope.options.saveDashboard = scope.externalSaveDashboard;
-        scope.options.removeWidget = scope.removeWidget;
-        scope.options.openWidgetSettings = scope.openWidgetSettings;
-
-        // save state
-        scope.$on('widgetChanged', function (event) {
-          event.stopPropagation();
-          scope.saveDashboard();
-        });
-      }
-    };
-  }]);
+      }]);
 
 angular.module("ui.dashboard").run(["$templateCache", function($templateCache) {$templateCache.put("components/directives/dashboard/altDashboard.html","<div>\n    <div class=\"btn-toolbar\" ng-if=\"!options.hideToolbar\">\n        <div class=\"btn-group\" ng-if=\"!options.widgetButtons\">\n            <span class=\"dropdown\" on-toggle=\"toggled(open)\">\n              <button type=\"button\" class=\"btn btn-primary dropdown-toggle\" ng-disabled=\"disabled\">\n                Button dropdown <span class=\"caret\"></span>\n              </button>\n              <ul class=\"dropdown-menu\" role=\"menu\">\n                <li ng-repeat=\"widget in widgetDefs\">\n                  <a href=\"#\" ng-click=\"addWidgetInternal($event, widget);\" class=\"dropdown-toggle\">{{widget.name}}</a>\n                </li>\n              </ul>\n            </span>\n        </div>\n\n        <div class=\"btn-group\" ng-if=\"options.widgetButtons\">\n            <button ng-repeat=\"widget in widgetDefs\"\n                    ng-click=\"addWidgetInternal($event, widget);\" type=\"button\" class=\"btn btn-primary\">\n                {{widget.name}}\n            </button>\n        </div>\n\n        <button class=\"btn btn-warning\" ng-click=\"resetWidgetsToDefault()\">Default Widgets</button>\n\n        <button ng-if=\"options.storage && options.explicitSave\" ng-click=\"options.saveDashboard()\" class=\"btn btn-success\" ng-hide=\"!options.unsavedChangeCount\">{{ !options.unsavedChangeCount ? \"Alternative - No Changes\" : \"Save\" }}</button>\n\n        <button ng-click=\"clear();\" ng-hide=\"!widgets.length\" type=\"button\" class=\"btn btn-info\">Clear</button>\n    </div>\n\n    <div ui-sortable=\"sortableOptions\" ng-model=\"widgets\" class=\"dashboard-widget-area\">\n        <div ng-repeat=\"widget in widgets\" ng-style=\"widget.style\" class=\"widget-container\" widget>\n            <div class=\"widget panel panel-default\">\n                <div class=\"widget-header panel-heading\">\n                    <h3 class=\"panel-title\">\n                        <span class=\"widget-title\" ng-dblclick=\"editTitle(widget)\" ng-hide=\"widget.editingTitle\">{{widget.title}}</span>\n                        <form action=\"\" class=\"widget-title\" ng-show=\"widget.editingTitle\" ng-submit=\"saveTitleEdit(widget)\">\n                            <input type=\"text\" ng-model=\"widget.title\" class=\"form-control\">\n                        </form>\n                        <span class=\"label label-primary\" ng-if=\"!options.hideWidgetName\">{{widget.name}}</span>\n                        <span ng-click=\"removeWidget(widget);\" class=\"glyphicon glyphicon-remove\" ng-if=\"!options.hideWidgetClose\"></span>\n                        <span ng-click=\"openWidgetSettings(widget);\" class=\"glyphicon glyphicon-cog\" ng-if=\"!options.hideWidgetSettings\"></span>\n                    </h3>\n                </div>\n                <div class=\"panel-body widget-content\"></div>\n                <div class=\"widget-ew-resizer\" ng-mousedown=\"grabResizer($event)\"></div>\n            </div>\n        </div>\n    </div>\n</div>\n");
 $templateCache.put("components/directives/dashboard/dashboard.html","<div>\n    <div class=\"btn-toolbar\" ng-if=\"!options.hideToolbar\">\n        <div class=\"btn-group\" ng-if=\"!options.widgetButtons\">\n            <span class=\"dropdown\" on-toggle=\"toggled(open)\">\n              <button type=\"button\" class=\"btn btn-primary dropdown-toggle\" data-toggle=\"dropdown\">\n                Button dropdown <span class=\"caret\"></span>\n              </button>\n              <ul class=\"dropdown-menu\" role=\"menu\">\n                <li ng-repeat=\"widget in widgetDefs\">\n                  <a href=\"#\" ng-click=\"addWidgetInternal($event, widget);\" class=\"dropdown-toggle\"><span class=\"label label-primary\">{{widget.name}}</span></a>\n                </li>\n              </ul>\n            </span>\n    </div>\n        <div class=\"btn-group\" ng-if=\"options.widgetButtons\">\n            <button ng-repeat=\"widget in widgetDefs\"\n                    ng-click=\"addWidgetInternal($event, widget);\" type=\"button\" class=\"btn btn-primary\">\n                {{widget.name}}\n            </button>\n        </div>\n\n        <button class=\"btn btn-warning\" ng-click=\"resetWidgetsToDefault()\">Default Widgets</button>\n\n        <button ng-if=\"options.storage && options.explicitSave\" ng-click=\"options.saveDashboard()\" class=\"btn btn-success\" ng-disabled=\"!options.unsavedChangeCount\">{{ !options.unsavedChangeCount ? \"all saved\" : \"save changes (\" + options.unsavedChangeCount + \")\" }}</button>\n\n        <button ng-click=\"clear();\" type=\"button\" class=\"btn btn-info\">Clear</button>\n    </div>\n\n    <div ui-sortable=\"sortableOptions\" ng-model=\"widgets\" class=\"dashboard-widget-area\">\n        <div ng-repeat=\"widget in widgets\" ng-style=\"widget.containerStyle\" class=\"widget-container\" widget>\n            <div class=\"widget panel panel-default\">\n                <div class=\"widget-header panel-heading\">\n                    <h3 class=\"panel-title\">\n                        <span class=\"widget-title\" ng-dblclick=\"editTitle(widget)\" ng-hide=\"widget.editingTitle\">{{widget.title}}</span>\n                        <form action=\"\" class=\"widget-title\" ng-show=\"widget.editingTitle\" ng-submit=\"saveTitleEdit(widget)\">\n                            <input type=\"text\" ng-model=\"widget.title\" class=\"form-control\">\n                        </form>\n                        <span class=\"label label-primary\" ng-if=\"!options.hideWidgetName\">{{widget.name}}</span>\n                        <span ng-click=\"removeWidget(widget);\" class=\"glyphicon glyphicon-remove\" ng-if=\"!options.hideWidgetClose\"></span>\n                        <span ng-click=\"openWidgetSettings(widget);\" class=\"glyphicon glyphicon-cog\" ng-if=\"!options.hideWidgetSettings\"></span>\n                        <span ng-click=\"widget.contentStyle.display = widget.contentStyle.display === \'none\' ? \'block\' : \'none\'\" class=\"glyphicon\" ng-class=\"{\'glyphicon-plus\': widget.contentStyle.display === \'none\', \'glyphicon-minus\': widget.contentStyle.display !== \'none\' }\"></span>\n                    </h3>\n                </div>\n                <div class=\"panel-body widget-content\" ng-style=\"widget.contentStyle\"></div>\n                <div class=\"widget-ew-resizer\" ng-mousedown=\"grabResizer($event)\"></div>\n                <div ng-if=\"widget.enableVerticalResize\" class=\"widget-s-resizer\" ng-mousedown=\"grabSouthResizer($event)\"></div>\n            </div>\n        </div>\n    </div>\n</div>");
